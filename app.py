@@ -6,8 +6,10 @@ from langchain_community.document_loaders import TextLoader
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-from langchain_community.chains import RetrievalQA
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 # ---------------------------------------------------------
 # Page Configuration & Custom CSS
@@ -19,16 +21,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Eco-Friendly UI CSS Styling
 st.markdown("""
 <style>
-    /* Main Background & Fonts */
     .stApp {
         background: linear-gradient(180deg, #f4f9f5 0%, #ffffff 100%);
         font-family: 'Inter', sans-serif;
     }
-    
-    /* Header Styling */
     .eco-header {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
         padding: 24px 32px;
@@ -37,85 +35,43 @@ st.markdown("""
         margin-bottom: 24px;
         box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.2);
     }
-    
-    .eco-header h1 {
-        color: white !important;
-        font-weight: 700;
-        font-size: 2.2rem;
-        margin: 0;
-    }
-    
-    .eco-header p {
-        color: #a7f3d0 !important;
-        font-size: 1.05rem;
-        margin-top: 6px;
-        margin-bottom: 0;
-    }
-    
-    /* Custom Badges */
+    .eco-header h1 { color: white !important; font-weight: 700; font-size: 2.2rem; margin: 0; }
+    .eco-header p { color: #a7f3d0 !important; font-size: 1.05rem; margin-top: 6px; margin-bottom: 0; }
     .green-badge {
-        background-color: #d1fae5;
-        color: #065f46;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        display: inline-block;
-        border: 1px solid #a7f3d0;
+        background-color: #d1fae5; color: #065f46; padding: 4px 12px;
+        border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+        display: inline-block; border: 1px solid #a7f3d0;
     }
-
     .cache-badge {
-        background-color: #fef3c7;
-        color: #92400e;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        display: inline-block;
-        border: 1px solid #fde68a;
+        background-color: #fef3c7; color: #92400e; padding: 4px 12px;
+        border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+        display: inline-block; border: 1px solid #fde68a;
     }
-
-    /* Metric Cards in Sidebar */
     .metric-card {
-        background: white;
-        border-radius: 12px;
-        padding: 16px;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        background: white; border-radius: 12px; padding: 16px;
+        border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         margin-bottom: 12px;
-    }
-
-    /* Expander Styling */
-    .streamlit-expanderHeader {
-        background-color: #f0fdf4 !important;
-        border-radius: 8px !important;
-        color: #166534 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Secrets Check
+# Secrets & Model Setup
 # ---------------------------------------------------------
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("⚠️ `GROQ_API_KEY` not found. Please add it to your Streamlit secrets or environment variables.")
+    st.error("⚠️ `GROQ_API_KEY` missing in Streamlit secrets!")
     st.stop()
 
-# ---------------------------------------------------------
-# Resource Initialization & Caching
-# ---------------------------------------------------------
-@st.cache_resource(show_spinner="🌱 Loading lightweight embedding model...")
+@st.cache_resource(show_spinner="🌱 Loading embedding model...")
 def load_embedder():
-    """33M parameter CPU-friendly embedding model (~130MB)."""
     return HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
 @st.cache_resource(show_spinner="📚 Indexing extinct species database...")
 def init_vector_store(_embeddings):
-    """Load and index documents for RAG context."""
     if not os.path.exists("extinct_birds_data.txt"):
-        st.error("File `extinct_birds_data.txt` missing! Please upload your dataset.")
+        st.error("File `extinct_birds_data.txt` missing! Please upload it to GitHub.")
         st.stop()
 
     loader = TextLoader("extinct_birds_data.txt")
@@ -126,7 +82,6 @@ def init_vector_store(_embeddings):
 
 @st.cache_resource
 def init_green_llm():
-    """1B parameter model hosted on energy-efficient LPU hardware."""
     return ChatGroq(
         groq_api_key=GROQ_API_KEY,
         model_name="llama-3.2-1b-preview",
@@ -136,28 +91,43 @@ def init_green_llm():
 embeddings = load_embedder()
 vectorstore = init_vector_store(embeddings)
 llm = init_green_llm()
-
 retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
-qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, return_source_documents=True)
+
+# Modern LCEL Prompt & Chain Definition
+prompt_template = """Answer the question based ONLY on the following context. If you don't know, say you don't know.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+prompt = ChatPromptTemplate.from_template(prompt_template)
+
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+# LCEL Chain (Replaces legacy RetrievalQA)
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
 
 # ---------------------------------------------------------
-# Session State Setup
+# Session State & Cache Logic
 # ---------------------------------------------------------
 if "semantic_cache" not in st.session_state:
     st.session_state.semantic_cache = []
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "cache_hits" not in st.session_state:
     st.session_state.cache_hits = 0
-
 if "fresh_queries" not in st.session_state:
     st.session_state.fresh_queries = 0
 
-# ---------------------------------------------------------
-# Semantic Cache Helper Logic
-# ---------------------------------------------------------
 def get_cached_response(user_query: str, similarity_threshold: float = 0.88):
     if not st.session_state.semantic_cache:
         return None, None, 0.0
@@ -189,23 +159,20 @@ def save_to_cache(user_query: str, answer: str, sources):
     })
 
 # ---------------------------------------------------------
-# Sidebar Layout & Metrics Dashboard
+# Sidebar Dashboard
 # ---------------------------------------------------------
 with st.sidebar:
     st.image("https://img.icons8.com/color/96/000000/leaf.png", width=64)
     st.title("🌱 Eco-Dashboard")
     st.caption("Real-time Sustainable Compute Metrics")
-
     st.markdown("---")
 
-    # Metrics
     col1, col2 = st.columns(2)
     with col1:
         st.metric(label="Fresh LLM Runs", value=st.session_state.fresh_queries)
     with col2:
         st.metric(label="Cache Hits ⚡", value=st.session_state.cache_hits)
 
-    # Saved Carbon/Tokens Estimation
     saved_tokens = st.session_state.cache_hits * 350
     st.markdown(f"""
     <div class="metric-card">
@@ -215,16 +182,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.subheader("💡 Green Tech Stack")
-    st.markdown("""
-    * **LLM Engine:** Groq LPU (`llama-3.2-1b`)
-    * **Embedding:** `bge-small-en-v1.5` (33M params)
-    * **Vector DB:** ChromaDB (In-Memory)
-    * **Cache:** Semantic Cosine Similarity (`> 88%`)
-    """)
-
-    if st.button("🗑️ Clear Cache & Chat History", use_container_width=True):
+    if st.button("🗑️ Clear Cache & Chat", use_container_width=True):
         st.session_state.semantic_cache = []
         st.session_state.messages = []
         st.session_state.cache_hits = 0
@@ -232,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ---------------------------------------------------------
-# Main Page Header
+# UI & Main Chat Loop
 # ---------------------------------------------------------
 st.markdown("""
 <div class="eco-header">
@@ -241,23 +199,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# Chat Interface
-# ---------------------------------------------------------
-# Display Chat History
 for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar="🦜" if message["role"] == "assistant" else "👤"):
         st.markdown(message["content"])
         if "badge" in message:
             st.markdown(message["badge"], unsafe_allow_html=True)
         if "sources" in message and message["sources"]:
-            with st.expander("🔍 View Retrieved Context Chunks"):
+            with st.expander("🔍 View Context Chunks"):
                 for idx, doc in enumerate(message["sources"]):
                     st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
 
-# Input Box
-if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passenger Pigeon, Great Auk)..."):
-    # Add User Message to History
+if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passenger Pigeon)..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
@@ -265,7 +217,6 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
     with st.chat_message("assistant", avatar="🦜"):
         start_time = time.time()
         
-        # 1. Check Semantic Cache
         cached_answer, cached_sources, sim_score = get_cached_response(prompt)
 
         if cached_answer:
@@ -277,7 +228,7 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
             st.markdown(badge_html, unsafe_allow_html=True)
 
             if cached_sources:
-                with st.expander("🔍 View Retrieved Context Chunks"):
+                with st.expander("🔍 View Context Chunks"):
                     for idx, doc in enumerate(cached_sources):
                         st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
 
@@ -289,16 +240,14 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
             })
 
         else:
-            # 2. Run Green RAG Pipeline
             st.session_state.fresh_queries += 1
-            with st.spinner("Retrieving species facts with green compute..."):
+            with st.spinner("Retrieving facts sustainably..."):
                 try:
-                    res = qa_chain.invoke(prompt)
-                    answer = res["result"]
-                    sources = res.get("source_documents", [])
+                    # Run LCEL chain
+                    answer = rag_chain.invoke(prompt)
+                    sources = retriever.invoke(prompt)
                     
                     latency = time.time() - start_time
-                    
                     save_to_cache(prompt, answer, sources)
 
                     st.markdown(answer)
@@ -306,7 +255,7 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
                     st.markdown(badge_html, unsafe_allow_html=True)
 
                     if sources:
-                        with st.expander("🔍 View Retrieved Context Chunks"):
+                        with st.expander("🔍 View Context Chunks"):
                             for idx, doc in enumerate(sources):
                                 st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
 
