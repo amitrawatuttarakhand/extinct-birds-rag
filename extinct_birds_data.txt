@@ -1,29 +1,37 @@
-import wikipedia
+Species Name: Dodo
+Extinction Year: ~1662
+Habitat: Mauritius
+Causes: Overhunting by sailors, habitat destruction, and invasive predators (pigs, rats, dogs).
+Summary: The dodo (Raphus cucullatus) was an extinct flightless bird endemic to the island of Mauritius, east of Madagascar in the Indian Ocean. It stood about 1 metre (3 ft 3 in) tall and weighed around 10–18 kg (22–40 lb).
 
-# List of well-documented extinct bird species
-extinct_birds = [
-    "Dodo",
-    "Passenger Pigeon",
-    "Great Auk",
-    "Carolina Parakeet",
-    "Huia",
-    "Moa",
-    "Stephen Island Wren",
-    "Tasmanian Emu",
-    "Labrador Duck",
-    "Ivory-billed woodpecker"
-]
+---
 
-with open("extinct_birds_data.txt", "w", encoding="utf-8") as f:
-    for bird in extinct_birds:
-        try:
-            print(f"Fetching data for {bird}...")
-            page = wikipedia.page(bird, auto_suggest=False)
-            # Write key summary paragraph
-            f.write(f"Species Name: {bird}\n")
-            f.write(f"Summary: {page.summary[:1000]}\n")
-            f.write("\n---\n\n")
-        except Exception as e:
-            print(f"Skipped {bird}: {e}")
+Species Name: Passenger Pigeon
+Extinction Year: 1914
+Habitat: North America
+Causes: Commercial hunting for meat and large-scale deforestation destroying nesting colonies.
+Summary: The passenger pigeon or wild pigeon (Ectopistes migratorius) was an extinct species of pigeon endemic to North America. It lived in enormous flocks, once forming 25 to 40 percent of the total bird population of the United States.
 
-print("Dataset generated successfully in extinct_birds_data.txt")
+---
+
+Species Name: Great Auk
+Extinction Year: 1844
+Habitat: North Atlantic coasts (Canada, Greenland, Iceland, Great Britain)
+Causes: Excessive harvesting for down feathers, meat, fat, and museum specimens.
+Summary: The great auk (Pinguinus impennis) was a flightless bird of the alcid family that became extinct in the mid-19th century. It was the only modern species in the genus Pinguinus.
+
+---
+
+Species Name: Carolina Parakeet
+Extinction Year: 1918
+Habitat: Eastern, Midwest, and Plains states of the United States
+Causes: Habitat loss from agricultural clearing, hunting as a farm pest, and trade for hat feathers.
+Summary: The Carolina parakeet (Conuropsis carolinensis) was a small green neotropical parrot with a bright yellow and orange head endemic to the eastern, Midwest and Plains states of the United States.
+
+---
+
+Species Name: Huia
+Extinction Year: 1907
+Habitat: North Island of New Zealand
+Causes: Overhunting for tail feathers (used in traditional Maori headwear and collector trade) and widespread forest clearing.
+Summary: The huia (Heteralocha acutirostris) was an extinct species of New Zealand wattlebird, endemic to the North Island. The species was notable for having the most pronounced sexual dimorphism in bill shape of any bird species in the world.
