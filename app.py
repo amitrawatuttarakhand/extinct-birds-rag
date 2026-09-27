@@ -84,7 +84,7 @@ def init_vector_store(_embeddings):
 def init_green_llm():
     return ChatGroq(
         groq_api_key=GROQ_API_KEY,
-        model_name="llama-3.2-3b-preview",
+        model_name="llama-3.1-8b-instant",
         temperature=0.1
     )
 
