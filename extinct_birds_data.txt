@@ -1,0 +1,29 @@
+import wikipedia
+
+# List of well-documented extinct bird species
+extinct_birds = [
+    "Dodo",
+    "Passenger Pigeon",
+    "Great Auk",
+    "Carolina Parakeet",
+    "Huia",
+    "Moa",
+    "Stephen Island Wren",
+    "Tasmanian Emu",
+    "Labrador Duck",
+    "Ivory-billed woodpecker"
+]
+
+with open("extinct_birds_data.txt", "w", encoding="utf-8") as f:
+    for bird in extinct_birds:
+        try:
+            print(f"Fetching data for {bird}...")
+            page = wikipedia.page(bird, auto_suggest=False)
+            # Write key summary paragraph
+            f.write(f"Species Name: {bird}\n")
+            f.write(f"Summary: {page.summary[:1000]}\n")
+            f.write("\n---\n\n")
+        except Exception as e:
+            print(f"Skipped {bird}: {e}")
+
+print("Dataset generated successfully in extinct_birds_data.txt")
