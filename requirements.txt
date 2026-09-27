@@ -2,7 +2,7 @@ streamlit
 langchain
 langchain-community
 langchain-huggingface
+langchain-groq
 chromadb
 sentence-transformers
-langchain-groq
-
+numpy
