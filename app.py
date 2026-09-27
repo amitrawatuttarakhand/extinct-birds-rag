@@ -12,7 +12,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
 # ---------------------------------------------------------
-# Page Configuration & Custom CSS
+# Page Configuration & Modern CSS Theme with Contrast Fixes
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Eco-Birds RAG | Sustainable AI Knowledge Base",
@@ -23,45 +23,96 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* Base App Styling & Global Text Visibility */
     .stApp {
         background: linear-gradient(180deg, #f4f9f5 0%, #ffffff 100%);
         font-family: 'Inter', sans-serif;
+        color: #1f2937 !important;
     }
+
+    /* Force Dark Visible Text in Chat Messages, Labels, and Paragraphs */
+    .stChatMessage, .stMarkdown, p, span, li, label {
+        color: #1f2937 !important;
+    }
+
+    /* Header Styling */
     .eco-header {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
         padding: 24px 32px;
         border-radius: 16px;
-        color: white;
+        color: white !important;
         margin-bottom: 24px;
         box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.2);
     }
-    .eco-header h1 { color: white !important; font-weight: 700; font-size: 2.2rem; margin: 0; }
+    .eco-header h1 { color: #ffffff !important; font-weight: 700; font-size: 2.2rem; margin: 0; }
     .eco-header p { color: #a7f3d0 !important; font-size: 1.05rem; margin-top: 6px; margin-bottom: 0; }
+
+    /* Fix Context Chunks Expander Contrast (White Text Fix) */
+    div[data-testid="stExpander"] {
+        background-color: #ffffff !important;
+        border: 1px solid #d1fae5 !important;
+        border-radius: 10px !important;
+        margin-top: 8px;
+    }
+
+    div[data-testid="stExpander"] summary {
+        background-color: #ecfdf5 !important;
+        color: #065f46 !important;
+        border-radius: 10px !important;
+        font-weight: 600;
+    }
+
+    div[data-testid="stExpander"] details p, 
+    div[data-testid="stExpander"] div,
+    div[data-testid="stExpander"] span {
+        color: #111827 !important; /* High contrast dark text inside context blocks */
+    }
+
+    /* Custom Green & Cache Badges */
     .green-badge {
-        background-color: #d1fae5; color: #065f46; padding: 4px 12px;
-        border-radius: 20px; font-size: 0.85rem; font-weight: 600;
-        display: inline-block; border: 1px solid #a7f3d0;
+        background-color: #d1fae5;
+        color: #065f46 !important;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+        border: 1px solid #a7f3d0;
+        margin-top: 6px;
     }
+
     .cache-badge {
-        background-color: #fef3c7; color: #92400e; padding: 4px 12px;
-        border-radius: 20px; font-size: 0.85rem; font-weight: 600;
-        display: inline-block; border: 1px solid #fde68a;
+        background-color: #fef3c7;
+        color: #92400e !important;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+        border: 1px solid #fde68a;
+        margin-top: 6px;
     }
+
+    /* Metric Cards in Sidebar */
     .metric-card {
-        background: white; border-radius: 12px; padding: 16px;
-        border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         margin-bottom: 12px;
+        color: #111827 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Secrets & Model Setup
+# Secrets & Model Initialization
 # ---------------------------------------------------------
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("⚠️ `GROQ_API_KEY` missing in Streamlit secrets!")
+    st.error("⚠️ `GROQ_API_KEY` missing in Streamlit secrets! Please set it in Settings -> Secrets.")
     st.stop()
 
 @st.cache_resource(show_spinner="🌱 Loading embedding model...")
@@ -71,10 +122,10 @@ def load_embedder():
 @st.cache_resource(show_spinner="📚 Indexing extinct species database...")
 def init_vector_store(_embeddings):
     if not os.path.exists("extinct_birds_data.txt"):
-        st.error("File `extinct_birds_data.txt` missing! Please upload it to GitHub.")
+        st.error("File `extinct_birds_data.txt` missing! Please upload the text dataset to GitHub.")
         st.stop()
 
-    loader = TextLoader("extinct_birds_data.txt")
+    loader = TextLoader("extinct_birds_data.txt", encoding="utf-8")
     documents = loader.load()
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     docs = text_splitter.split_documents(documents)
@@ -84,7 +135,7 @@ def init_vector_store(_embeddings):
 def init_green_llm():
     return ChatGroq(
         groq_api_key=GROQ_API_KEY,
-        model_name="openai/gpt-oss-120b",
+        model_name="llama-3.1-8b-instant",
         temperature=0.1
     )
 
@@ -93,8 +144,14 @@ vectorstore = init_vector_store(embeddings)
 llm = init_green_llm()
 retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
-# Modern LCEL Prompt & Chain Definition
-prompt_template = """Answer the question based ONLY on the following context. If you don't know, say you don't know.
+# ---------------------------------------------------------
+# Modern LCEL Prompt & RAG Chain Architecture
+# ---------------------------------------------------------
+prompt_template = """You are a helpful Eco-AI assistant specializing in extinct bird species.
+
+If the user query is a general greeting (like 'hi', 'hello', 'hey'), greet them back warmly and invite them to ask about extinct birds.
+
+Otherwise, answer the question strictly based on the following retrieved context. If the information is not present in the context, politely state that you do not have that information in your database.
 
 Context:
 {context}
@@ -108,7 +165,6 @@ prompt = ChatPromptTemplate.from_template(prompt_template)
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
-# LCEL Chain (Replaces legacy RetrievalQA)
 rag_chain = (
     {"context": retriever | format_docs, "question": RunnablePassthrough()}
     | prompt
@@ -117,7 +173,7 @@ rag_chain = (
 )
 
 # ---------------------------------------------------------
-# Session State & Cache Logic
+# Semantic Cache & Session Management
 # ---------------------------------------------------------
 if "semantic_cache" not in st.session_state:
     st.session_state.semantic_cache = []
@@ -162,7 +218,6 @@ def save_to_cache(user_query: str, answer: str, sources):
 # Sidebar Dashboard
 # ---------------------------------------------------------
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/leaf.png", width=64)
     st.title("🌱 Eco-Dashboard")
     st.caption("Real-time Sustainable Compute Metrics")
     st.markdown("---")
@@ -182,7 +237,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("🗑️ Clear Cache & Chat", use_container_width=True):
+    if st.button("🗑️ Clear Cache & Chat History", use_container_width=True):
         st.session_state.semantic_cache = []
         st.session_state.messages = []
         st.session_state.cache_hits = 0
@@ -190,7 +245,7 @@ with st.sidebar:
         st.rerun()
 
 # ---------------------------------------------------------
-# UI & Main Chat Loop
+# Main UI & Chat Interface
 # ---------------------------------------------------------
 st.markdown("""
 <div class="eco-header">
@@ -207,7 +262,7 @@ for message in st.session_state.messages:
         if "sources" in message and message["sources"]:
             with st.expander("🔍 View Context Chunks"):
                 for idx, doc in enumerate(message["sources"]):
-                    st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
+                    st.markdown(f"**Chunk {idx+1}:**\n{doc.page_content}")
 
 if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passenger Pigeon)..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -230,7 +285,7 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
             if cached_sources:
                 with st.expander("🔍 View Context Chunks"):
                     for idx, doc in enumerate(cached_sources):
-                        st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
+                        st.markdown(f"**Chunk {idx+1}:**\n{doc.page_content}")
 
             st.session_state.messages.append({
                 "role": "assistant",
@@ -243,7 +298,6 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
             st.session_state.fresh_queries += 1
             with st.spinner("Retrieving facts sustainably..."):
                 try:
-                    # Run LCEL chain
                     answer = rag_chain.invoke(prompt)
                     sources = retriever.invoke(prompt)
                     
@@ -251,13 +305,13 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
                     save_to_cache(prompt, answer, sources)
 
                     st.markdown(answer)
-                    badge_html = f'<div class="green-badge">🌱 Fresh Llama 3.2 1B • {latency:.2f}s</div>'
+                    badge_html = f'<div class="green-badge">🌱 Fresh Llama 3.1 8B • {latency:.2f}s</div>'
                     st.markdown(badge_html, unsafe_allow_html=True)
 
                     if sources:
                         with st.expander("🔍 View Context Chunks"):
                             for idx, doc in enumerate(sources):
-                                st.markdown(f"**Chunk {idx+1}:** {doc.page_content}")
+                                st.markdown(f"**Chunk {idx+1}:**\n{doc.page_content}")
 
                     st.session_state.messages.append({
                         "role": "assistant",
