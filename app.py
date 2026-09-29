@@ -26,7 +26,6 @@ st.markdown("""
     .stApp {
         background: linear-gradient(180deg, #f4f9f5 0%, #ffffff 100%);
         font-family: 'Inter', sans-serif;
-        color: #000000;
     }
     .eco-header {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
