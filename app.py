@@ -250,7 +250,7 @@ if prompt := st.chat_input("Ask about an extinct bird species (e.g., Dodo, Passe
                     latency = time.time() - start_time
                     save_to_cache(prompt, answer, sources)
 
-                    st.markdown(answer)
+                    st.markdown(f'<div style="color: #059669; font-weight: 500;">{answer}</div>', unsafe_allow_html=True)
                     badge_html = f'<div class="green-badge">🌱 Fresh Llama 3.2 1B • {latency:.2f}s</div>'
                     st.markdown(badge_html, unsafe_allow_html=True)
 
